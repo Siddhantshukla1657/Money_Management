@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/person.dart';
+import '../models/bill_split.dart';
 import '../services/storage_service.dart';
 import '../screens/person_detail_screen.dart';
 import '../screens/add_person_screen.dart';
+import '../screens/bill_split_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -102,6 +104,82 @@ class _HomeScreenState extends State<HomeScreen> {
     savePersons();
   }
 
+  void handleBillSplit(BillSplit billSplit) {
+    final amountPerPerson = billSplit.amountPerPerson;
+    
+    for (final splitPerson in billSplit.splitPersons) {
+      // Skip yourself - you don't owe yourself money
+      if (splitPerson.id == 'user_self') {
+        continue;
+      }
+      
+      // Find existing person or create new one
+      Person? existingPerson;
+      try {
+        existingPerson = persons.firstWhere((p) => p.id == splitPerson.id);
+      } catch (e) {
+        existingPerson = null;
+      }
+      
+      if (existingPerson == null) {
+        // Create new person if not from contacts
+        if (!splitPerson.isFromContacts) {
+          existingPerson = Person(
+            id: splitPerson.id,
+            name: splitPerson.name,
+            transactions: [],
+          );
+          persons.add(existingPerson);
+        } else {
+          // Skip if from contacts but person doesn't exist
+          continue;
+        }
+      }
+      
+      if (existingPerson != null) {
+        // Add transaction (positive because they owe you)
+        final transaction = Transaction(
+          id: Uuid().v4(),
+          amount: amountPerPerson, // Positive because they owe you
+          description: 'Bill Split: ${billSplit.description}',
+          date: billSplit.date,
+        );
+        
+        final updatedTransactions = [...existingPerson.transactions, transaction];
+        final updatedPerson = existingPerson.copyWith(transactions: updatedTransactions);
+        
+        final index = persons.indexWhere((p) => p.id == existingPerson!.id);
+        if (index >= 0) {
+          persons[index] = updatedPerson;
+        }
+      }
+    }
+    
+    setState(() {});
+    savePersons();
+  }
+
+  void deleteTransaction(String personId, String transactionId) {
+    final personIndex = persons.indexWhere((p) => p.id == personId);
+    if (personIndex >= 0) {
+      final person = persons[personIndex];
+      final updatedTransactions = person.transactions
+          .where((t) => t.id != transactionId)
+          .toList();
+      
+      final updatedPerson = person.copyWith(transactions: updatedTransactions);
+      
+      setState(() {
+        persons[personIndex] = updatedPerson;
+      });
+      savePersons();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Transaction deleted successfully')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -143,25 +221,52 @@ class _HomeScreenState extends State<HomeScreen> {
                       onViewDetails: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PersonDetailScreen(person: person),
+                          builder: (context) => PersonDetailScreen(
+                            person: person,
+                            onDeleteTransaction: (transactionId) => 
+                                deleteTransaction(person.id, transactionId),
+                          ),
                         ),
                       ),
                       onDelete: () => deletePerson(person),
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddPersonScreen()),
-          );
-          if (result != null) {
-            addPerson(result);
-          }
-        },
-        child: Icon(Icons.add),
-        backgroundColor: Colors.blue,
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BillSplitScreen(
+                    existingPersons: persons,
+                    onSplitCreated: handleBillSplit,
+                  ),
+                ),
+              );
+            },
+            child: Icon(Icons.receipt),
+            backgroundColor: Colors.green,
+            heroTag: "split_bill",
+          ),
+          SizedBox(height: 16),
+          FloatingActionButton(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AddPersonScreen()),
+              );
+              if (result != null) {
+                addPerson(result);
+              }
+            },
+            child: Icon(Icons.add),
+            backgroundColor: Colors.blue,
+            heroTag: "add_person",
+          ),
+        ],
       ),
     );
   }
@@ -254,7 +359,7 @@ class _PersonCardState extends State<PersonCard> {
                     controller: _amountController,
                     keyboardType: TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
-                      labelText: 'Amount (+they gave you/-you gave them)',
+                      labelText: 'Amount (+I gave them/-they gave me)',
                       border: OutlineInputBorder(),
                     ),
                   ),

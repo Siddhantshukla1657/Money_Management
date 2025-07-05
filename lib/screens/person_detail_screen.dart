@@ -2,19 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/person.dart';
 
-class PersonDetailScreen extends StatelessWidget {
+class PersonDetailScreen extends StatefulWidget {
   final Person person;
+  final Function(String transactionId)? onDeleteTransaction;
 
-  const PersonDetailScreen({Key? key, required this.person}) : super(key: key);
+  const PersonDetailScreen({
+    Key? key, 
+    required this.person,
+    this.onDeleteTransaction,
+  }) : super(key: key);
+
+  @override
+  _PersonDetailScreenState createState() => _PersonDetailScreenState();
+}
+
+class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sortedTransactions = [...person.transactions];
+    final sortedTransactions = [...widget.person.transactions];
     sortedTransactions.sort((a, b) => b.date.compareTo(a.date));
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(person.name),
+        title: Text(widget.person.name),
         backgroundColor: Colors.blue,
       ),
       body: Column(
@@ -37,13 +48,13 @@ class PersonDetailScreen extends StatelessWidget {
                     children: [
                       Text('Total Amount:', style: TextStyle(fontSize: 16)),
                       Text(
-                        '${person.totalAmount.toStringAsFixed(2)}',
+                        '${widget.person.totalAmount.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: person.totalAmount == 0
+                          color: widget.person.totalAmount == 0
                               ? Colors.green
-                              : person.totalAmount > 0
+                              : widget.person.totalAmount > 0
                                   ? Colors.green
                                   : Colors.red,
                         ),
@@ -52,11 +63,11 @@ class PersonDetailScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    person.totalAmount == 0
+                    widget.person.totalAmount == 0
                         ? 'All settled'
-                        : person.totalAmount > 0
-                            ? 'They owe you: ${person.totalAmount.toStringAsFixed(2)}'
-                            : 'You owe them: ${(-person.totalAmount).toStringAsFixed(2)}',
+                        : widget.person.totalAmount > 0
+                            ? 'They owe you: ${widget.person.totalAmount.toStringAsFixed(2)}'
+                            : 'You owe them: ${(-widget.person.totalAmount).toStringAsFixed(2)}',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   SizedBox(height: 8),
@@ -65,7 +76,7 @@ class PersonDetailScreen extends StatelessWidget {
                     children: [
                       Text('Total Transactions:', style: TextStyle(fontSize: 16)),
                       Text(
-                        '${person.transactions.length}',
+                        '${widget.person.transactions.length}',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -76,7 +87,7 @@ class PersonDetailScreen extends StatelessWidget {
           ),
           // Transaction History
           Expanded(
-            child: person.transactions.isEmpty
+            child: widget.person.transactions.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -100,7 +111,12 @@ class PersonDetailScreen extends StatelessWidget {
                     itemCount: sortedTransactions.length,
                     itemBuilder: (context, index) {
                       final transaction = sortedTransactions[index];
-                      return TransactionCard(transaction: transaction);
+                      return TransactionCard(
+                        transaction: transaction,
+                        onDelete: widget.onDeleteTransaction != null
+                            ? () => _deleteTransaction(transaction.id)
+                            : null,
+                      );
                     },
                   ),
           ),
@@ -108,12 +124,43 @@ class PersonDetailScreen extends StatelessWidget {
       ),
     );
   }
+
+  void _deleteTransaction(String transactionId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Transaction'),
+          content: Text('Are you sure you want to delete this transaction? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onDeleteTransaction!(transactionId);
+                Navigator.of(context).pop(); // Go back to home screen
+              },
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class TransactionCard extends StatelessWidget {
   final Transaction transaction;
+  final VoidCallback? onDelete;
 
-  const TransactionCard({Key? key, required this.transaction}) : super(key: key);
+  const TransactionCard({
+    Key? key, 
+    required this.transaction,
+    this.onDelete,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -137,13 +184,27 @@ class TransactionCard extends StatelessWidget {
           DateFormat('MMM dd, yyyy - HH:mm').format(transaction.date),
           style: TextStyle(color: Colors.grey[600]),
         ),
-        trailing: Text(
-          '$prefix${transaction.amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$prefix${transaction.amount.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            if (onDelete != null) ...[
+              SizedBox(width: 8),
+              IconButton(
+                icon: Icon(Icons.delete_outline, color: Colors.red),
+                onPressed: onDelete,
+                constraints: BoxConstraints(),
+                padding: EdgeInsets.all(4),
+              ),
+            ],
+          ],
         ),
       ),
     );
