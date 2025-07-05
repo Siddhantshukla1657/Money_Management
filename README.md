@@ -54,8 +54,8 @@ Manage your personal finances by tracking who owes you money and who you owe mon
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Siddhantshukla1657/money_management.git
-   cd money_management
+   git clone https://github.com/Siddhantshukla1657/Money_Management.git
+   cd Money_Management
    ```
 
 2. Get dependencies:
