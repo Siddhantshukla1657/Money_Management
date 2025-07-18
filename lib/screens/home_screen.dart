@@ -136,24 +136,22 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
       
-      if (existingPerson != null) {
-        // Add transaction (positive because they owe you)
-        final transaction = Transaction(
-          id: Uuid().v4(),
-          amount: amountPerPerson, // Positive because they owe you
-          description: 'Bill Split: ${billSplit.description}',
-          date: billSplit.date,
-        );
-        
-        final updatedTransactions = [...existingPerson.transactions, transaction];
-        final updatedPerson = existingPerson.copyWith(transactions: updatedTransactions);
-        
-        final index = persons.indexWhere((p) => p.id == existingPerson!.id);
-        if (index >= 0) {
-          persons[index] = updatedPerson;
-        }
+      // Add transaction (positive because they owe you)
+      final transaction = Transaction(
+        id: Uuid().v4(),
+        amount: amountPerPerson, // Positive because they owe you
+        description: 'Bill Split: ${billSplit.description}',
+        date: billSplit.date,
+      );
+      
+      final updatedTransactions = [...existingPerson.transactions, transaction];
+      final updatedPerson = existingPerson.copyWith(transactions: updatedTransactions);
+      
+      final index = persons.indexWhere((p) => p.id == existingPerson!.id);
+      if (index >= 0) {
+        persons[index] = updatedPerson;
       }
-    }
+        }
     
     setState(() {});
     savePersons();
